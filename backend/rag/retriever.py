@@ -1,3 +1,4 @@
+import re
 import chromadb
 from pathlib import Path
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
@@ -14,14 +15,14 @@ def index_docs():
     ids, docs, metas = [], [], []
     for md in DOCS_DIR.glob("*.md"):
         text = md.read_text()
-        # split into ~500 char chunks with overlap
-        chunk_size, overlap = 500, 50
-        for i in range(0, len(text), chunk_size - overlap):
-            chunk = text[i:i + chunk_size].strip()
-            if not chunk:
+        # split by ## sections to keep each topic intact
+        sections = re.split(r'\n(?=## )', text)
+        for i, section in enumerate(sections):
+            section = section.strip()
+            if not section:
                 continue
             ids.append(f"{md.stem}_{i}")
-            docs.append(chunk)
+            docs.append(section)
             metas.append({"source": md.name})
     if ids:
         _collection.upsert(ids=ids, documents=docs, metadatas=metas)

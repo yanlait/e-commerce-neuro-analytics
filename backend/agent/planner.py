@@ -17,16 +17,23 @@ def answer(question: str, history: list[dict]) -> dict:
     sql = generate_sql(question)
 
     if not sql:
-        log(question, None, 0, 0)
-        return {"sql": None, "data": None, "chunks": chunks}
+        trace_id = trace_query(question, None, None, 0, chunks=chunks)
+        log(question, None, 0, 0, answer_type="rag")
+        return {"sql": None, "data": None, "chunks": chunks, "trace_id": trace_id}
 
     t0 = time.monotonic()
     try:
         result = run_sql(sql)
         latency_ms = (time.monotonic() - t0) * 1000
-        trace_query(question, sql, result, latency_ms)
+
+        # empty result — enrich with RAG context so user understands why
+        all_none = all(v is None or (isinstance(v, float) and v != v) for row in result for v in row.values())
+        if not result or all_none:
+            chunks = retrieve(question + " date range dataset period")
+
+        trace_id = trace_query(question, sql, result, latency_ms, chunks=chunks)
         log(question, sql, len(result), latency_ms)
-        return {"sql": sql, "data": result, "chunks": chunks}
+        return {"sql": sql, "data": result, "chunks": chunks, "trace_id": trace_id}
     except Exception as e:
         latency_ms = (time.monotonic() - t0) * 1000
         log(question, sql, 0, latency_ms, error=str(e))
