@@ -1,0 +1,90 @@
+tables:
+  orders:
+    description: "Customer orders with status and timestamps"
+    file: orders.parquet
+    columns:
+      order_id: {type: string, pk: true}
+      customer_id: {type: string, fk: customers.customer_id}
+      order_status: {type: string, values: [delivered, shipped, canceled, invoiced, processing, created, approved, unavailable]}
+      order_purchase_timestamp: {type: datetime}
+      order_approved_at: {type: datetime}
+      order_delivered_customer_date: {type: datetime}
+      order_estimated_delivery_date: {type: datetime}
+
+  order_items:
+    description: "Line items within each order"
+    file: order_items.parquet
+    columns:
+      order_id: {type: string, fk: orders.order_id}
+      order_item_id: {type: int}
+      product_id: {type: string, fk: products.product_id}
+      seller_id: {type: string, fk: sellers.seller_id}
+      price: {type: float}
+      freight_value: {type: float}
+
+  products:
+    description: "Product catalog with categories"
+    file: products.parquet
+    columns:
+      product_id: {type: string, pk: true}
+      product_category_name: {type: string, fk: category_translation.product_category_name}
+      product_weight_g: {type: int}
+
+  customers:
+    description: "Customer base with geolocation"
+    file: customers.parquet
+    columns:
+      customer_id: {type: string, pk: true}
+      customer_unique_id: {type: string}
+      customer_city: {type: string}
+      customer_state: {type: string}
+
+  reviews:
+    description: "Order reviews and scores"
+    file: reviews.parquet
+    columns:
+      review_id: {type: string, pk: true}
+      order_id: {type: string, fk: orders.order_id}
+      review_score: {type: int, range: [1, 5]}
+      review_comment_message: {type: string}
+
+  payments:
+    description: "Payment transactions per order"
+    file: payments.parquet
+    columns:
+      order_id: {type: string, fk: orders.order_id}
+      payment_type: {type: string, values: [credit_card, boleto, voucher, debit_card]}
+      payment_installments: {type: int}
+      payment_value: {type: float}
+
+  sellers:
+    description: "Seller profiles with geolocation"
+    file: sellers.parquet
+    columns:
+      seller_id: {type: string, pk: true}
+      seller_city: {type: string}
+      seller_state: {type: string}
+
+  category_translation:
+    description: "Translates Portuguese category names to English"
+    file: category_translation.parquet
+    columns:
+      product_category_name: {type: string}
+      product_category_name_english: {type: string}
+
+metrics:
+  total_revenue:
+    description: "Sum of all item prices"
+    sql: "SELECT SUM(price) FROM order_items"
+
+  avg_order_value:
+    description: "Average revenue per order"
+    sql: "SELECT AVG(order_total) FROM (SELECT order_id, SUM(price) as order_total FROM order_items GROUP BY order_id)"
+
+  avg_review_score:
+    description: "Average customer satisfaction score (1-5)"
+    sql: "SELECT AVG(review_score) FROM reviews"
+
+  monthly_revenue:
+    description: "Revenue grouped by month"
+    sql: "SELECT DATE_TRUNC('month', o.order_purchase_timestamp) as month, SUM(oi.price) as revenue FROM orders o JOIN order_items oi ON o.order_id = oi.order_id GROUP BY 1 ORDER BY 1"
