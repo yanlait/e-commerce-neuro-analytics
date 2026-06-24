@@ -4,6 +4,21 @@
 Only **3.12%** of customers place more than one order — Olist is dominated by one-time buyers.
 This is typical for Brazilian marketplace dynamics in 2016–2018.
 
+## Registration Date
+There is no explicit registration date in the dataset.
+The closest proxy is the date of a customer's first order: MIN(order_purchase_timestamp) grouped by customer_unique_id.
+"First registered customer" = customer with the earliest first order date.
+
+```sql
+SELECT c.customer_unique_id,
+       MIN(CAST(o.order_purchase_timestamp AS TIMESTAMP)) AS first_order_date
+FROM customers c
+JOIN orders o ON c.customer_id = o.customer_id
+GROUP BY c.customer_unique_id
+ORDER BY first_order_date ASC
+LIMIT 1;
+```
+
 ## customer_id vs customer_unique_id
 This is a critical gotcha in the dataset:
 - `customer_id` in the orders table is **order-scoped** — a new ID is generated per order

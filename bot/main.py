@@ -32,6 +32,9 @@ def format_response(result: dict) -> str:
             if len(result["data"]) > 10:
                 parts.append(f"...и ещё {len(result['data']) - 10} строк")
 
+    if result.get("explanation"):
+        parts.insert(0, f"💡 {result['explanation']}")
+
     if result.get("sql"):
         parts.append(f"SQL:\n{result['sql']}")
 
@@ -66,8 +69,11 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     question = update.message.text
     await update.message.reply_text("Думаю...")
 
+    # keep last 6 messages as history (3 turns)
+    history = ctx.user_data.get("history", [])
+
     try:
-        result = answer(question, history=[])
+        result = answer(question, history=history)
 
         if result.get("message"):
             await update.message.reply_text(result["message"])
@@ -76,13 +82,21 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         text = format_response(result)
         trace_id = result.get("trace_id")
 
+        # update history
+        assistant_text = result.get("sql") or (result["chunks"][0]["text"][:200] if result.get("chunks") else "")
+        history = history + [
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": assistant_text},
+        ]
+        ctx.user_data["history"] = history[-6:]  # keep last 3 turns
+
         keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("👍", callback_data=f"feedback:1:{trace_id}"),
                 InlineKeyboardButton("👎", callback_data=f"feedback:0:{trace_id}"),
             ]
         ])
-        msg = await update.message.reply_text(text, reply_markup=keyboard)
+        await update.message.reply_text(text, reply_markup=keyboard)
 
     except Exception as e:
         await update.message.reply_text(f"Ошибка: {e}")
