@@ -68,6 +68,11 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     try:
         result = answer(question, history=[])
+
+        if result.get("message"):
+            await update.message.reply_text(result["message"])
+            return
+
         text = format_response(result)
         trace_id = result.get("trace_id")
 

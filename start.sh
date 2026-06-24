@@ -1,6 +1,10 @@
 #!/bin/bash
 cd "$(dirname "$0")"
 
+echo "Starting Ollama..."
+ollama serve &> /tmp/ollama.log &
+sleep 2
+
 echo "Starting Langfuse..."
 docker compose -f docker/docker-compose.yml up -d
 

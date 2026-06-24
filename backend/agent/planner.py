@@ -7,12 +7,26 @@ Decides which tool to use for a given user question:
 import time
 from .sql_runner import run_sql
 from .sql_generator import generate_sql
+from .classifier import is_analytics_question
 from .tracer import trace_query
 from .query_log import log
 from ..rag.retriever import retrieve
 
+NOT_ANALYTICS_REPLY = (
+    "Привет! Я аналитический ассистент по e-commerce данным Olist.\n\n"
+    "Задай вопрос про данные, например:\n"
+    "• Top 5 product categories by revenue\n"
+    "• Average review score by state\n"
+    "• Monthly revenue in 2017\n"
+    "• What is LTV?"
+)
+
 
 def answer(question: str, history: list[dict]) -> dict:
+    if not is_analytics_question(question):
+        log(question, None, 0, 0, answer_type="rejected")
+        return {"sql": None, "data": None, "chunks": [], "trace_id": None, "message": NOT_ANALYTICS_REPLY}
+
     chunks = retrieve(question)
     sql = generate_sql(question)
 
