@@ -145,3 +145,16 @@ def test_rag_retrieval(case):
     result = answer(case["question"], history=[])
     assert result.get("chunks"), f"No RAG chunks returned for: {case['question']}"
     assert len(result["chunks"]) > 0
+
+
+EXPLANATION_CASES = [
+    "Who was the first registered customer?",
+    "Do we have registration date in the dataset?",
+    "What is the profit margin?",
+]
+
+@pytest.mark.parametrize("question", EXPLANATION_CASES)
+def test_explanation_present(question):
+    result = answer(question, history=[])
+    assert result.get("explanation"), f"No explanation returned for: {question}"
+    assert len(result["explanation"]) > 10, f"Explanation too short for: {question}"
