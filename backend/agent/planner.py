@@ -19,7 +19,10 @@ NOT_ANALYTICS_REPLY = (
 def answer(question: str, history: list[dict]) -> dict:
     if not is_analytics_question(question):
         log(question, None, 0, 0, answer_type="rejected")
-        return {"sql": None, "data": None, "chunks": [], "trace_id": None, "message": NOT_ANALYTICS_REPLY}
+        return {
+            "sql": None, "data": None, "chunks": [], "trace_id": None,
+            "answer_type": "rejected", "message": NOT_ANALYTICS_REPLY,
+        }
 
     chunks = retrieve(question)
     generated = generate_sql(question, history=history)
@@ -29,7 +32,10 @@ def answer(question: str, history: list[dict]) -> dict:
     if not sql:
         trace_id = trace_query(question, None, None, 0, chunks=chunks)
         log(question, None, 0, 0, answer_type="rag")
-        return {"sql": None, "data": None, "chunks": chunks, "trace_id": trace_id, "explanation": explanation}
+        return {
+            "sql": None, "data": None, "chunks": chunks,
+            "trace_id": trace_id, "answer_type": "rag", "explanation": explanation,
+        }
 
     t0 = time.monotonic()
     try:
@@ -42,7 +48,17 @@ def answer(question: str, history: list[dict]) -> dict:
 
         trace_id = trace_query(question, sql, result, latency_ms, chunks=chunks)
         log(question, sql, len(result), latency_ms)
-        return {"sql": sql, "data": result, "chunks": chunks, "trace_id": trace_id, "explanation": explanation}
+        return {
+            "sql": sql, "data": result, "chunks": chunks,
+            "trace_id": trace_id, "answer_type": "sql", "explanation": explanation,
+        }
+    except ValueError as e:
+        latency_ms = (time.monotonic() - t0) * 1000
+        log(question, sql, 0, latency_ms, error=str(e), answer_type="blocked")
+        return {
+            "sql": sql, "data": None, "chunks": [], "trace_id": None,
+            "answer_type": "blocked", "explanation": f"Blocked for security: {e}",
+        }
     except Exception as e:
         latency_ms = (time.monotonic() - t0) * 1000
         log(question, sql, 0, latency_ms, error=str(e))

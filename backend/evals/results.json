@@ -2,63 +2,63 @@
   {
     "id": "total_revenue",
     "question": "What is the total revenue?",
-    "sql": "SELECT SUM(payment_value) AS total_revenue\nFROM payments;",
+    "sql": "SELECT SUM(price) AS total_revenue FROM order_items;",
     "rows": 1,
-    "latency_ms": 3332,
-    "passed": 16008872.119998764,
+    "latency_ms": 7307,
+    "passed": 13591643.70001419,
     "error": null
   },
   {
     "id": "top_categories",
     "question": "Top 5 product categories by revenue",
-    "sql": "SELECT ct.product_category_name_english AS category,\n       SUM(oi.price) AS revenue\nFROM order_items oi\nJOIN products p ON oi.product_id = p.product_id\nJOIN category_translation ct ON p.product_category_name = ct.product_category_name\nGROUP BY ct.product_category_name_english\nORDER BY revenue DESC\nLIMIT 5;",
+    "sql": "SELECT ct.product_category_name_english, SUM(oi.price) AS revenue\nFROM order_items oi\nJOIN products p ON oi.product_id = p.product_id\nJOIN category_translation ct ON p.product_category_name = ct.product_category_name\nGROUP BY ct.product_category_name_english\nORDER BY revenue DESC\nLIMIT 5;",
     "rows": 5,
-    "latency_ms": 6595,
+    "latency_ms": 9609,
     "passed": true,
     "error": null
   },
   {
     "id": "avg_review",
     "question": "Average review score by product category, top 10",
-    "sql": "SELECT\n    ct.product_category_name_english,\n    AVG(r.review_score) AS avg_score\nFROM\n    reviews r\nJOIN orders o ON r.order_id = o.order_id\nJOIN order_items oi ON o.order_id = oi.order_id\nJOIN products p ON oi.product_id = p.product_id\nJOIN category_translation ct ON p.product_category_name = ct.product_category_name\nGROUP BY\n    ct.product_category_name_english\nORDER BY\n    avg_score DESC\nLIMIT 10;",
+    "sql": "SELECT ct.product_category_name_english AS category, AVG(r.review_score) AS avg_score FROM reviews r JOIN order_items oi ON r.order_id = oi.order_id JOIN products p ON oi.product_id = p.product_id JOIN category_translation ct ON p.product_category_name = ct.product_category_name GROUP BY ct.product_category_name_english ORDER BY avg_score DESC LIMIT 10;",
     "rows": 10,
-    "latency_ms": 8607,
+    "latency_ms": 10603,
     "passed": true,
     "error": null
   },
   {
     "id": "monthly_revenue_2017",
     "question": "Monthly revenue in 2017",
-    "sql": "SELECT\n    DATE_TRUNC('month', CAST(orders.order_purchase_timestamp AS TIMESTAMP)) AS month,\n    SUM(payments.payment_value) AS revenue\nFROM orders\nJOIN payments ON orders.order_id = payments.order_id\nWHERE EXTRACT(year FROM CAST(orders.order_purchase_timestamp AS TIMESTAMP)) = 2017\nGROUP BY month\nORDER BY month;",
+    "sql": "SELECT DATE_TRUNC('month', CAST(o.order_purchase_timestamp AS TIMESTAMP)) AS month, SUM(p.payment_value) AS revenue\nFROM payments p\nJOIN orders o ON p.order_id = o.order_id\nWHERE EXTRACT(year FROM CAST(o.order_purchase_timestamp AS TIMESTAMP)) = 2017\nGROUP BY month\nORDER BY month;",
     "rows": 12,
-    "latency_ms": 5545,
+    "latency_ms": 8588,
     "passed": true,
     "error": null
   },
   {
     "id": "top_states",
     "question": "Top 5 states by number of orders",
-    "sql": "SELECT c.customer_state AS state, COUNT(*) AS order_count\nFROM orders o\nJOIN customers c ON o.customer_id = c.customer_id\nGROUP BY c.customer_state\nORDER BY order_count DESC\nLIMIT 5;",
+    "sql": "SELECT customers.customer_state AS state, COUNT(*) AS order_count FROM orders JOIN customers ON orders.customer_id = customers.customer_id GROUP BY customers.customer_state ORDER BY order_count DESC LIMIT 5",
     "rows": 5,
-    "latency_ms": 4547,
+    "latency_ms": 7117,
     "passed": true,
     "error": null
   },
   {
     "id": "payment_methods",
     "question": "Which payment method is most popular?",
-    "sql": "SELECT payment_type, COUNT(*) AS payment_count\nFROM payments\nGROUP BY payment_type\nORDER BY payment_count DESC\nLIMIT 1;",
+    "sql": "SELECT payment_type, COUNT(*) AS payment_count FROM payments GROUP BY payment_type ORDER BY payment_count DESC LIMIT 1;",
     "rows": 1,
-    "latency_ms": 3043,
+    "latency_ms": 6579,
     "passed": true,
     "error": null
   },
   {
     "id": "ltv",
     "question": "Top 10 customers by LTV (lifetime value)",
-    "sql": "SELECT\n    o.customer_id,\n    SUM(p.payment_value) AS ltv\nFROM\n    orders o\nJOIN\n    payments p\n    ON o.order_id = p.order_id\nGROUP BY\n    o.customer_id\nORDER BY\n    ltv DESC\nLIMIT 10;",
+    "sql": "SELECT c.customer_id,\n       c.customer_unique_id,\n       c.customer_city,\n       c.customer_state,\n       SUM(p.payment_value) AS lifetime_value\nFROM customers AS c\nJOIN orders AS o ON o.customer_id = c.customer_id\nJOIN payments AS p ON p.order_id = o.order_id\nGROUP BY c.customer_id, c.customer_unique_id, c.customer_city, c.customer_state\nORDER BY lifetime_value DESC\nLIMIT 10;",
     "rows": 10,
-    "latency_ms": 6099,
+    "latency_ms": 10112,
     "passed": true,
     "error": null
   }

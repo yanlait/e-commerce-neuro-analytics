@@ -25,8 +25,13 @@ def _get_anthropic():
 
 def eval_answer_type(run, example):
     expected = example.outputs.get("expected_answer_type")
+    options = example.outputs.get("expected_answer_type_options")
     actual = run.outputs.get("answer_type", "unknown")
-    return {"key": "answer_type_correct", "score": int(expected == actual)}
+    if options:
+        score = int(actual in options)
+    else:
+        score = int(expected == actual)
+    return {"key": "answer_type_correct", "score": score}
 
 
 def eval_row_count(run, example):
