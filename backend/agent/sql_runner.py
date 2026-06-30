@@ -27,8 +27,9 @@ def run_sql(sql: str) -> list[dict]:
         raise ValueError(f"SQL contains disallowed statement: {_BLOCKED.search(sql).group()}")
     if _UNBOUNDED_STAR.search(sql) and "LIMIT" not in sql.upper():
         raise ValueError("SELECT * without LIMIT is not allowed")
-    if _REQUIRES_LIMIT.search(sql) and "LIMIT" not in sql.upper() and "GROUP BY" not in sql.upper():
-        raise ValueError("Queries on raw tables require LIMIT or GROUP BY")
+    _has_aggregation = re.search(r"\b(COUNT|SUM|AVG|MAX|MIN)\s*\(", sql, re.IGNORECASE)
+    if _REQUIRES_LIMIT.search(sql) and "LIMIT" not in sql.upper() and "GROUP BY" not in sql.upper() and not _has_aggregation:
+        raise ValueError("Queries on raw tables require LIMIT, GROUP BY, or aggregation function")
     con = _get_connection()
     result = con.execute(sql).fetchdf()
     # translate portuguese category names if column present

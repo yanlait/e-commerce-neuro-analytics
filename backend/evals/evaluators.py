@@ -104,7 +104,7 @@ def eval_numeric_value(run, example):
     for row in data:
         for v in row.values():
             try:
-                if abs(float(v) - expected_val) <= tolerance:
+                if abs(round(float(v), 4) - expected_val) <= tolerance:
                     return {"key": "numeric_value_correct", "score": 1}
             except (TypeError, ValueError):
                 continue
