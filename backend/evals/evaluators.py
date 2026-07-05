@@ -83,15 +83,19 @@ def eval_sql_valid(run, example):
 # ---------------------------------------------------------------------------
 
 def eval_expected_contains(run, example):
-    """Check if expected keyword appears in SQL or explanation."""
+    """Check if expected keyword appears anywhere in the answer surface:
+    SQL, explanation, returned data, or retrieved RAG chunks."""
     keyword = example.outputs.get("expected_contains")
     if not keyword:
         return {"key": "contains_expected_keyword", "score": None}
-    sql = (run.outputs.get("sql") or "").lower()
-    explanation = (run.outputs.get("explanation") or "").lower()
-    data_str = str(run.outputs.get("data") or "").lower()
-    found = keyword.lower() in sql or keyword.lower() in explanation or keyword.lower() in data_str
-    return {"key": "contains_expected_keyword", "score": int(found)}
+    kw = keyword.lower()
+    haystack = " ".join([
+        (run.outputs.get("sql") or ""),
+        (run.outputs.get("explanation") or ""),
+        str(run.outputs.get("data") or ""),
+        (run.outputs.get("chunks_text") or ""),
+    ]).lower()
+    return {"key": "contains_expected_keyword", "score": int(kw in haystack)}
 
 
 def eval_numeric_value(run, example):
@@ -112,8 +116,17 @@ def eval_numeric_value(run, example):
 
 
 def eval_has_explanation(run, example):
-    explanation = run.outputs.get("explanation", "")
-    score = 1 if explanation and len(explanation) > 15 else 0
+    """Every answer should carry human-readable content:
+    an explanation for SQL/blocked, or retrieved chunks for RAG."""
+    answer_type = run.outputs.get("answer_type")
+    explanation = run.outputs.get("explanation", "") or ""
+    chunks_text = run.outputs.get("chunks_text", "") or ""
+    if answer_type == "rag":
+        score = 1 if len(chunks_text) > 15 else 0
+    elif answer_type in ("rejected",):
+        score = None  # canned message, not an explanation
+    else:
+        score = 1 if len(explanation) > 15 else 0
     return {"key": "has_explanation", "score": score}
 
 
@@ -122,20 +135,25 @@ def eval_has_explanation(run, example):
 # ---------------------------------------------------------------------------
 
 def eval_explanation_quality(run, example):
-    """Claude Haiku judges if the explanation is helpful and accurate."""
-    explanation = run.outputs.get("explanation", "")
-    question = example.inputs.get("question", "")
+    """Claude Haiku judges if the answer is helpful and accurate.
+    Uses the explanation for SQL answers, or retrieved chunks for RAG answers."""
     answer_type = run.outputs.get("answer_type")
+    question = example.inputs.get("question", "")
     ground_truth = example.outputs.get("ground_truth", "")
 
-    if answer_type in ("blocked", "rejected") or not explanation:
+    if answer_type == "rag":
+        content = run.outputs.get("chunks_text", "")
+    else:
+        content = run.outputs.get("explanation", "")
+
+    if answer_type in ("blocked", "rejected") or not content:
         return {"key": "explanation_quality", "score": None}
 
     prompt = f"""You are evaluating an analytics assistant response.
 
 Question: {question}
 Ground truth: {ground_truth}
-Assistant explanation: {explanation}
+Assistant answer: {content[:1500]}
 
 Rate the explanation on these criteria:
 1. Is it accurate compared to ground truth?
@@ -163,6 +181,8 @@ def eval_faithfulness(run, example):
         return {"key": "faithfulness", "score": None}
 
     explanation = run.outputs.get("explanation", "")
+    if answer_type == "rag":
+        explanation = run.outputs.get("chunks_text", "")[:1500]
     data = run.outputs.get("data") or []
     ground_truth = example.outputs.get("ground_truth", "")
 

@@ -87,6 +87,7 @@ def run_assistant(inputs: dict) -> dict:
             "explanation": result.get("explanation", ""),
             "data": result.get("data") or [],
             "has_chunks": bool(result.get("chunks")),
+            "chunks_text": " ".join(c.get("text", "") for c in (result.get("chunks") or [])),
             "model": result.get("model"),
             "provider": result.get("provider"),
             "cost_usd": result.get("cost_usd"),
