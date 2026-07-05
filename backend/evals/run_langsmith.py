@@ -23,8 +23,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from langsmith import Client
 from langsmith.evaluation import evaluate as ls_evaluate
-from backend.agent.planner import answer
 from backend.evals.evaluators import ALL, FAST
+
+# choose implementation under test: graph (LangGraph) or planner (linear router)
+AGENT_IMPL = os.environ.get("AGENT_IMPL", "graph")
+if AGENT_IMPL == "graph":
+    from backend.agent.graph import answer
+else:
+    from backend.agent.planner import answer
 
 DATASET_NAME = "olist-analytics-golden"
 GOLDEN_PATH = Path(__file__).parent / "golden_dataset.json"
@@ -87,6 +93,8 @@ def run_assistant(inputs: dict) -> dict:
             "input_tokens": result.get("input_tokens"),
             "output_tokens": result.get("output_tokens"),
             "llm_latency_ms": result.get("latency_ms"),
+            "repair_attempts": result.get("repair_attempts", 0),
+            "grounding_ok": result.get("grounding_ok", True),
         }
     except ValueError as e:
         return {"answer_type": "blocked", "rows": 0, "sql": None, "explanation": str(e), "data": []}
@@ -151,7 +159,7 @@ def main():
         run_assistant,
         data=DATASET_NAME,
         evaluators=evaluators,
-        experiment_prefix=f"analytics-{cat}-{mode}",
+        experiment_prefix=f"{AGENT_IMPL}-{cat}-{mode}",
         client=client,
     )
 

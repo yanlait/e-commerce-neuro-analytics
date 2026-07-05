@@ -13,15 +13,40 @@ _schema = yaml.safe_load(
 )
 
 
-def generate_sql(question: str, history: list[dict] | None = None) -> dict:
+def generate_sql(
+    question: str,
+    history: list[dict] | None = None,
+    context_chunks: list[dict] | None = None,
+    repair: dict | None = None,
+) -> dict:
+    """
+    context_chunks: retrieved metric definitions / schema hints injected into the prompt.
+    repair: {"sql": <bad sql>, "error": <db error>} — asks the model to fix a failed query.
+    """
     prompt = _lf.get_prompt("sql-generator", label="latest")
     compiled = prompt.compile(schema=yaml.dump(_schema["tables"], allow_unicode=True))
 
     system = compiled if isinstance(compiled, str) else compiled[0]["content"]
+
+    # inject retrieved context so metric definitions inform generation
+    if context_chunks:
+        ctx = "\n\n".join(f"[{c['source']}]\n{c['text']}" for c in context_chunks[:3])
+        system += (
+            "\n\nRelevant documentation (use these definitions to pick the correct "
+            f"tables/columns and metric formulas):\n{ctx}"
+        )
+
     messages = [{"role": "system", "content": system}]
     if history:
         messages += history
-    messages.append({"role": "user", "content": question})
+
+    user_content = question
+    if repair:
+        user_content = (
+            f"{question}\n\nYour previous SQL failed:\n{repair['sql']}\n\n"
+            f"Error:\n{repair['error']}\n\nReturn corrected SQL in the same JSON format."
+        )
+    messages.append({"role": "user", "content": user_content})
 
     result = chat(messages)
     raw = result["text"]
