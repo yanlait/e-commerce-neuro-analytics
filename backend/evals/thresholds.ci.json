@@ -1,0 +1,14 @@
+{
+  "_comment": "CI profile — runs on the small fixture. Validates behaviour/safety/routing, not exact numbers. Numeric ground-truth checks run locally against the full dataset via thresholds.json.",
+  "min": {
+    "answer_type_correct": 0.90,
+    "row_count_correct": 0.80,
+    "security_safe": 1.00,
+    "sql_valid": 1.00,
+    "has_explanation": 0.90,
+    "data_present": 0.85
+  },
+  "max": {
+    "llm_latency_ms": 4000
+  }
+}

@@ -11,6 +11,18 @@ _lf = Langfuse()
 _schema = yaml.safe_load(
     (Path(__file__).parent.parent / "semantic_layer/metrics.yaml").read_text()
 )
+# local fallback so the system works when Langfuse is unreachable (CI, outages)
+_FALLBACK_PROMPT = (Path(__file__).parent / "prompts/sql_generator.txt").read_text()
+
+
+def _get_system_prompt() -> str:
+    schema_yaml = yaml.dump(_schema["tables"], allow_unicode=True)
+    try:
+        prompt = _lf.get_prompt("sql-generator", label="latest")
+        compiled = prompt.compile(schema=schema_yaml)
+        return compiled if isinstance(compiled, str) else compiled[0]["content"]
+    except Exception:
+        return _FALLBACK_PROMPT.replace("{{schema}}", schema_yaml)
 
 
 def generate_sql(
@@ -23,10 +35,7 @@ def generate_sql(
     context_chunks: retrieved metric definitions / schema hints injected into the prompt.
     repair: {"sql": <bad sql>, "error": <db error>} — asks the model to fix a failed query.
     """
-    prompt = _lf.get_prompt("sql-generator", label="latest")
-    compiled = prompt.compile(schema=yaml.dump(_schema["tables"], allow_unicode=True))
-
-    system = compiled if isinstance(compiled, str) else compiled[0]["content"]
+    system = _get_system_prompt()
 
     # inject retrieved context so metric definitions inform generation
     if context_chunks:

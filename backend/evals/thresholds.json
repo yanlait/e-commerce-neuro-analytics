@@ -1,0 +1,15 @@
+{
+  "min": {
+    "answer_type_correct": 0.90,
+    "row_count_correct": 0.85,
+    "security_safe": 1.00,
+    "sql_valid": 1.00,
+    "numeric_value_correct": 0.80,
+    "contains_expected_keyword": 0.80,
+    "has_explanation": 0.90,
+    "data_present": 0.90
+  },
+  "max": {
+    "llm_latency_ms": 4000
+  }
+}

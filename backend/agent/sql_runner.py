@@ -1,8 +1,12 @@
+import os
 import re
 import duckdb
 from pathlib import Path
 
-DATA_DIR = Path(__file__).parent.parent.parent / "data/processed"
+# DATA_DIR override lets CI point at the small committed fixture
+DATA_DIR = Path(os.environ.get(
+    "DATA_DIR", str(Path(__file__).parent.parent.parent / "data/processed")
+))
 
 _BLOCKED = re.compile(
     r"\b(DROP|DELETE|INSERT|UPDATE|ALTER|CREATE|TRUNCATE|EXEC|EXECUTE|GRANT|REVOKE)\b",

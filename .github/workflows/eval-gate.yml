@@ -1,0 +1,53 @@
+name: Eval Gate
+
+# Quality gate for the LLM agent. Runs the golden dataset through the graph on a
+# small committed fixture and blocks the PR if behaviour/safety/routing regresses
+# below thresholds.ci.json. Numeric ground-truth checks run locally (thresholds.json).
+
+on:
+  pull_request:
+    paths:
+      - "backend/agent/**"
+      - "backend/semantic_layer/**"
+      - "backend/rag/**"
+      - "backend/evals/golden_dataset.json"
+      - "backend/evals/thresholds*.json"
+      - "docs/**"
+  workflow_dispatch:
+
+jobs:
+  eval-gate:
+    runs-on: ubuntu-latest
+    env:
+      LLM_PROVIDER: openai
+      LLM_MODEL: gpt-4o-mini
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      AGENT_IMPL: graph
+      GATE_PROFILE: ci
+      DATA_DIR: backend/evals/fixtures
+      # Langfuse unreachable in CI → sql_generator falls back to local prompt file
+      LANGFUSE_HOST: http://localhost:9999
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install openai duckdb chromadb sentence-transformers \
+                      pandas pyarrow pyyaml python-dotenv langfuse langgraph langsmith requests
+
+      - name: Build RAG index from docs
+        run: python -c "from backend.rag.retriever import index_docs; index_docs()"
+
+      - name: Run eval gate
+        run: python backend/evals/gate.py --markdown gate_report.md
+
+      - name: Post results to PR
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: gate_report.md
