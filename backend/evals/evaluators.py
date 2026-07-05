@@ -197,12 +197,30 @@ Reply with ONLY a decimal 0.0 to 1.0. 1.0 = fully faithful, 0.0 = hallucination.
 # Evaluator sets
 # ---------------------------------------------------------------------------
 
+def eval_cost(run, example):
+    """Surface per-call cost as a metric (lower is better)."""
+    cost = run.outputs.get("cost_usd")
+    if cost is None:
+        return {"key": "cost_usd", "score": None}
+    return {"key": "cost_usd", "score": cost}
+
+
+def eval_latency(run, example):
+    """Surface LLM latency in ms as a metric (lower is better)."""
+    latency = run.outputs.get("llm_latency_ms")
+    if latency is None:
+        return {"key": "llm_latency_ms", "score": None}
+    return {"key": "llm_latency_ms", "score": latency}
+
+
 DETERMINISTIC = [
     eval_answer_type,
     eval_row_count,
     eval_not_empty_when_expected,
     eval_security_blocked,
     eval_sql_valid,
+    eval_cost,
+    eval_latency,
 ]
 
 HEURISTIC = [

@@ -81,6 +81,12 @@ def run_assistant(inputs: dict) -> dict:
             "explanation": result.get("explanation", ""),
             "data": result.get("data") or [],
             "has_chunks": bool(result.get("chunks")),
+            "model": result.get("model"),
+            "provider": result.get("provider"),
+            "cost_usd": result.get("cost_usd"),
+            "input_tokens": result.get("input_tokens"),
+            "output_tokens": result.get("output_tokens"),
+            "llm_latency_ms": result.get("latency_ms"),
         }
     except ValueError as e:
         return {"answer_type": "blocked", "rows": 0, "sql": None, "explanation": str(e), "data": []}
@@ -96,14 +102,22 @@ def print_summary(results):
     print("EVALUATION SUMMARY")
     print("="*60)
 
+    # cost/latency are measurements, not pass/fail metrics
+    MEASUREMENTS = {"cost_usd", "llm_latency_ms"}
+
     for col in score_cols:
         metric = col.replace("feedback.", "")
         vals = df[col].dropna()
         if len(vals) == 0:
             continue
         avg = vals.mean()
-        passed = (vals >= 0.8).sum()
-        print(f"  {metric:<30} avg={avg:.2f}  passed={passed}/{len(vals)}")
+        if metric in MEASUREMENTS:
+            total = vals.sum()
+            unit = "$" if "cost" in metric else "ms"
+            print(f"  {metric:<30} avg={avg:.4f}{unit}  total={total:.4f}{unit}")
+        else:
+            passed = (vals >= 0.8).sum()
+            print(f"  {metric:<30} avg={avg:.2f}  passed={passed}/{len(vals)}")
 
     print()
     # show failures

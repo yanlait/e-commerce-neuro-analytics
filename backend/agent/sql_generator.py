@@ -1,9 +1,9 @@
 import json
 import yaml
-import requests
 from pathlib import Path
 from dotenv import load_dotenv
 from langfuse import Langfuse
+from .llm import chat
 
 load_dotenv()
 
@@ -23,22 +23,17 @@ def generate_sql(question: str, history: list[dict] | None = None) -> dict:
         messages += history
     messages.append({"role": "user", "content": question})
 
-    response = requests.post(
-        "http://localhost:11434/api/chat",
-        json={"model": "gpt-oss:20b", "messages": messages, "stream": False},
-        timeout=60,
-    )
-    response.raise_for_status()
-    raw = response.json()["message"]["content"].strip()
+    result = chat(messages)
+    raw = result["text"]
 
     # strip markdown code blocks if model adds them
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
 
     try:
-        result = json.loads(raw)
-        sql = result.get("sql", "").strip()
-        explanation = result.get("explanation", "")
+        parsed = json.loads(raw)
+        sql = parsed.get("sql", "").strip()
+        explanation = parsed.get("explanation", "")
     except json.JSONDecodeError:
         # fallback: treat as plain SQL if model ignores JSON instruction
         sql = raw if raw.upper().startswith(("SELECT", "WITH")) else ""
@@ -47,4 +42,13 @@ def generate_sql(question: str, history: list[dict] | None = None) -> dict:
     if not sql.upper().startswith(("SELECT", "WITH")):
         sql = None
 
-    return {"sql": sql, "explanation": explanation}
+    return {
+        "sql": sql,
+        "explanation": explanation,
+        "llm_latency_ms": result["latency_ms"],
+        "llm_cost_usd": result["cost_usd"],
+        "llm_model": result["model"],
+        "llm_provider": result["provider"],
+        "input_tokens": result["input_tokens"],
+        "output_tokens": result["output_tokens"],
+    }

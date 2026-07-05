@@ -16,6 +16,17 @@ NOT_ANALYTICS_REPLY = (
 )
 
 
+def _llm_meta(generated: dict) -> dict:
+    return {
+        "model": generated.get("llm_model"),
+        "provider": generated.get("llm_provider"),
+        "latency_ms": generated.get("llm_latency_ms"),
+        "cost_usd": generated.get("llm_cost_usd"),
+        "input_tokens": generated.get("input_tokens"),
+        "output_tokens": generated.get("output_tokens"),
+    }
+
+
 def answer(question: str, history: list[dict]) -> dict:
     if not is_analytics_question(question):
         log(question, None, 0, 0, answer_type="rejected")
@@ -28,13 +39,17 @@ def answer(question: str, history: list[dict]) -> dict:
     generated = generate_sql(question, history=history)
     sql = generated["sql"]
     explanation = generated["explanation"]
+    meta = _llm_meta(generated)
 
     if not sql:
-        trace_id = trace_query(question, None, None, 0, chunks=chunks)
-        log(question, None, 0, 0, answer_type="rag")
+        trace_id = trace_query(question, None, None, 0, chunks=chunks, llm_meta=meta)
+        log(question, None, 0, 0, answer_type="rag",
+            model=meta["model"], cost_usd=meta["cost_usd"],
+            input_tokens=meta["input_tokens"], output_tokens=meta["output_tokens"],
+            llm_latency_ms=meta["latency_ms"])
         return {
             "sql": None, "data": None, "chunks": chunks,
-            "trace_id": trace_id, "answer_type": "rag", "explanation": explanation,
+            "trace_id": trace_id, "answer_type": "rag", "explanation": explanation, **meta,
         }
 
     t0 = time.monotonic()
@@ -46,18 +61,24 @@ def answer(question: str, history: list[dict]) -> dict:
         if not result or all_none:
             chunks = retrieve(question + " date range dataset period")
 
-        trace_id = trace_query(question, sql, result, latency_ms, chunks=chunks)
-        log(question, sql, len(result), latency_ms)
+        trace_id = trace_query(question, sql, result, latency_ms, chunks=chunks, llm_meta=meta)
+        log(question, sql, len(result), latency_ms,
+            model=meta["model"], cost_usd=meta["cost_usd"],
+            input_tokens=meta["input_tokens"], output_tokens=meta["output_tokens"],
+            llm_latency_ms=meta["latency_ms"])
         return {
             "sql": sql, "data": result, "chunks": chunks,
-            "trace_id": trace_id, "answer_type": "sql", "explanation": explanation,
+            "trace_id": trace_id, "answer_type": "sql", "explanation": explanation, **meta,
         }
     except ValueError as e:
         latency_ms = (time.monotonic() - t0) * 1000
-        log(question, sql, 0, latency_ms, error=str(e), answer_type="blocked")
+        log(question, sql, 0, latency_ms, error=str(e), answer_type="blocked",
+            model=meta["model"], cost_usd=meta["cost_usd"],
+            input_tokens=meta["input_tokens"], output_tokens=meta["output_tokens"],
+            llm_latency_ms=meta["latency_ms"])
         return {
             "sql": sql, "data": None, "chunks": [], "trace_id": None,
-            "answer_type": "blocked", "explanation": f"Blocked for security: {e}",
+            "answer_type": "blocked", "explanation": f"Blocked for security: {e}", **meta,
         }
     except Exception as e:
         latency_ms = (time.monotonic() - t0) * 1000
