@@ -63,6 +63,13 @@ def chat(messages: list[dict], temperature: float = 0.0) -> dict:
     elif provider == "openai":
         from openai import OpenAI
         client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+        # trace LLM calls as generations in LangSmith when tracing is enabled
+        if os.environ.get("LANGSMITH_TRACING") == "true":
+            try:
+                from langsmith.wrappers import wrap_openai
+                client = wrap_openai(client)
+            except Exception:
+                pass
         resp = client.chat.completions.create(
             model=model, messages=messages, temperature=temperature,
         )
